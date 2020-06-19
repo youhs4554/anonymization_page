@@ -74,6 +74,8 @@ class App extends Component {
       this.state.selectedFile[0].name
     );
 
+    console.log(this.state.selectedFile[0])
+
     axios
       .post("http://155.230.214.71:9999/api/v1.0/anonymization", data, {
         onUploadProgress: (progressEvent) => {
