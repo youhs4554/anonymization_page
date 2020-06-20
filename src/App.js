@@ -6,9 +6,7 @@ import logo from "./logo.svg";
 import "./App.css";
 import axios from "axios";
 import ProgressBar from "react-customizable-progressbar";
-import { FaUpload } from "react-icons/fa";
-import styled from "styled-components";
-import DatatablePage from "./DatatablePage";
+import PulseLoader from "react-spinners/PulseLoader";
 
 class App extends Component {
   state = {
@@ -17,31 +15,88 @@ class App extends Component {
     anonyProgress: null,
     uploadCompleteMsg: null,
     anonyCompleteMsg: null,
+    unzip: null,
+    compress: null,
+    uploadDone: null,
+    annDone: null,
   };
   componentDidMount() {
     const that = this;
 
-    const es = new EventSource("http://127.0.0.1:9999/api/v1.0/stream");
+    const es = new EventSource("http://125.190.142.88:9999/api/v1.0/stream");
     es.addEventListener(
       "myevent",
       function (e) {
         // 'myevent' 이벤트의 데이터 처리
         var data = JSON.parse(e.data);
         var p = Math.round(data.percent);
-        if (p == 100) {
+        // console.log("data.unzip", data);
+        if (data.elpased_time) {
+          var tm = data.elpased_time + "/" + data.estimated_time;
           that.setState({
             anonyCompleteMsg: (
+              <p
+                style={{
+                  color: "white",
+                  fontSize: "18px",
+                }}
+              >
+                {tm}
+              </p>
+            ),
+          });
+          console.log(that.state.anonyCompleteMsg);
+        }
+        if (data.unzip) {
+          that.setState({
+            // un-toggle upload spinner an
+            unzip: false,
+            uploadCompleteMsg: (
               <h4
                 style={{
-                  color: "#C48D94",
-                  fontWeight: "bold",
+                  color: "#C1F70B",
+                  fontFamily: "Piedra",
+                  fontSize: "25px",
                 }}
               >
                 <u>Done!</u>
               </h4>
             ),
-            // toggle spinner to show zipping progress
-            // ...
+            uploadDone: true,
+          });
+        }
+        if (data.compress) {
+          that.setState({
+            compress: false,
+            anonyCompleteMsg: (
+              <h4
+                style={{
+                  color: "#C1F70B",
+                  fontFamily: "Piedra",
+                  fontSize: "25px",
+                }}
+              >
+                <u>Done!</u>
+              </h4>
+            ),
+            annDone: true,
+          });
+        }
+
+        if (that.state.annDone) {
+          // download resulting files
+          data.fileList.forEach((element) => {
+            window.open(
+              "http://125.190.142.88:9999/api/v1.0/download/" + element
+            );
+          });
+        }
+
+        if (p === 100) {
+          that.setState({
+            // toggle spinner to show compress progress
+            compress: true,
+            anonyCompleteMsg: "",
           });
         }
         if (!isNaN(p)) {
@@ -58,10 +113,12 @@ class App extends Component {
       anonyProgress: null,
       uploadCompleteMsg: null,
       anonyCompleteMsg: null,
+      uploadDone: null,
+      annDone: null,
     });
 
     var fileList = event.target.files;
-    if (fileList.length == 0) {
+    if (fileList.length === 0) {
       return false;
     }
 
@@ -95,11 +152,18 @@ class App extends Component {
   };
 
   fileUploadHandler = () => {
-    this.setState({ uploadCompleteMsg: null, tablePage: null });
+    this.setState({
+      uploadProgress: null,
+      anonyProgress: null,
+      uploadCompleteMsg: null,
+      anonyCompleteMsg: null,
+      uploadDone: null,
+      annDone: null,
+    });
     console.log(
       document.getElementsByClassName("form-control")[0].files.length
     );
-    if (document.getElementsByClassName("form-control")[0].files.length == 0) {
+    if (document.getElementsByClassName("form-control")[0].files.length === 0) {
       console.log("fall-out");
       return;
     }
@@ -115,26 +179,19 @@ class App extends Component {
     console.log(this.state.selectedFile[0]);
 
     axios
-      .post("http://127.0.0.1:9999/api/v1.0/anonymization", data, {
+      .post("http://125.190.142.88:9999/api/v1.0/anonymization", data, {
         onUploadProgress: (progressEvent) => {
+          var e = document.getElementById("flash-container");
+          e.textContent = "";
+
           var p = Math.round(
             (progressEvent.loaded / progressEvent.total) * 100
           );
 
-          if (p == 100) {
+          if (p === 100) {
             this.setState({
-              uploadCompleteMsg: (
-                <h4
-                  style={{
-                    color: "#5d9cec",
-                    fontWeight: "bold",
-                  }}
-                >
-                  <u>Done!</u>
-                </h4>
-              ),
               // toggle spinner to show unzip progress
-              // ...
+              unzip: true,
             });
           }
 
@@ -145,29 +202,30 @@ class App extends Component {
         },
       })
       .then((response) => {
-        console.log(response.data);
-        this.setState({
-          uploadProgress: null,
-          anonyProgress: null,
-        });
-        // TODO. will display download links
-        // this.setState({ tablePage: <DatatablePage></DatatablePage> });
+        console.log("########################", response);
       })
       .catch((error) => {
         // error handling
-        alert("server is not responding....");
+        // alert("server is not responding....");
         console.log(error);
+        var e = document.getElementById("flash-container");
+        e.textContent =
+          "Bad Request : This software supports '.dcm' file extention only!";
+        e.style.color = "red";
+        e.style.fontWeight = "bold";
+        this.setState({
+          uploadProgress: null,
+          anonyProgress: null,
+          uploadCompleteMsg: null,
+          anonyCompleteMsg: null,
+          unzip: null,
+          compress: null,
+          uploadDone: null,
+          annDone: null,
+        });
       });
   };
   render() {
-    const HoverBtn = styled.button`
-      &:hover {
-        background-color: orange;
-        border-color: gold;
-      }
-    `;
-    const items = [...Array(100)].map((val, i) => `Item ${i}`);
-
     return (
       <div
         className="App"
@@ -177,6 +235,8 @@ class App extends Component {
           alignItems: "center",
           flexDirection: "column",
           backgroundColor: "#272727",
+          minHeight: "100vh",
+          backgroundSize: "cover",
         }}
       >
         {/* tar, zip, 파일 업로드 허용!
@@ -184,92 +244,122 @@ class App extends Component {
           1) 압축 해제
           2) 익명화
           3) 재압축하고 다운로드 링크 제공*/}
-        <div>
-          <img src={logo} className="App-logo" alt="logo" />
-        </div>
+        <span
+          id="flash-container"
+          style={{
+            color: "black",
+            backgroundColor: "#F8EFA8",
+            width: "100%",
+            fontSize: "30px",
+          }}
+        ></span>
+        <h1
+          style={{
+            color: "white",
+            fontSize: "50px",
+            // fontWeight: "bold",
+            fontFamily: "Piedra",
+            textDecoration: "initial",
+          }}
+        >
+          Dicom Anonymization App
+        </h1>
+
+        <img src={logo} className="App-logo" alt="logo" />
 
         <input
-          style={{ width: "50%" }}
+          style={{ width: "50%", height: "50%" }}
           type="file"
-          class="form-control"
+          className="form-control"
           onChange={this.fileSelectedHandler}
           ref={(fileInput) => (this.fileInput = fileInput)}
         />
         <button
           style={{
             color: "white",
-            backgroundColor: "#007bff",
-            borderColor: "#007bff",
+            backgroundColor: "#00576B",
+            borderColor: "#00576B",
             padding: "8px 8px",
             margin: "10px",
             width: "50%",
-            fontFamily: "inherit",
-            fontSize: "1.0rem",
+            fontSize: "2.0rem",
+            fontWeight: "bold",
           }}
           onClick={this.fileUploadHandler}
           title="Upload & Run"
         >
-          {/* <button
-            onClick={this.download(
-              "https://www.w3schools.com/images/myw3schoolsimage.jpg"
-            )}
-          >
-            Click me
-          </button> */}
           Upload & Run
         </button>
         <div
           style={{
             display: "flex",
             flexDirection: "row",
+            justifyContent: "space-around",
+            width: "50%",
+            marginBottom: "4rem",
           }}
         >
           <div
             style={{
-              margin: "30px",
+              display: "flex",
+              alignItems: "center",
+              flexDirection: "column",
             }}
           >
-            <h4
+            <h3
               style={{
-                color: "white",
-                fontWeight: "bold",
+                color: this.state.uploadDone ? "#C1F70B" : "#5d9cec",
+                fontWeight: this.state.uploadDone ? "bold" : "normal",
+                fontFamily: "Piedra",
+                fontSize: "35px",
               }}
             >
               Upload
-            </h4>
+            </h3>
             <ProgressBar
               radius={100}
               progress={this.state.uploadProgress}
               strokeWidth={18}
-              strokeColor="#5d9cec"
+              strokeColor={this.state.uploadDone ? "#C1F70B" : "#5d9cec"}
               strokeLinecap="square"
               trackStrokeWidth={18}
             >
-              {this.state.uploadCompleteMsg}
+              <PulseLoader
+                size="15px"
+                margin="8px"
+                color={"#5d9cec"}
+                loading={this.state.unzip}
+              ></PulseLoader>
             </ProgressBar>
+
+            {this.state.uploadCompleteMsg}
           </div>
 
-          <div
-            style={{
-              margin: "30px",
-            }}
-          >
-            <h4
+          <div>
+            <h3
               style={{
-                color: "white",
-                fontWeight: "bold",
+                color: this.state.annDone ? "#C1F70B" : "#C48D94",
+                fontWeight: this.state.annDone ? "bold" : "normal",
+                fontFamily: "Piedra",
+                fontSize: "35px",
               }}
             >
               Anonymization
-            </h4>
+            </h3>
             <ProgressBar
               radius={100}
               progress={this.state.anonyProgress}
               strokeWidth={18}
-              strokeColor="#C48D94"
+              strokeColor={this.state.annDone ? "#C1F70B" : "#C48D94"}
               strokeLinecap="square"
               trackStrokeWidth={18}
             >
+              <PulseLoader
+                size="15px"
+                margin="8px"
+                color={"#C48D94"}
+                loading={this.state.compress}
+              />
               {this.state.anonyCompleteMsg}
             </ProgressBar>
           </div>
