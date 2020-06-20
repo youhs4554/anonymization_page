@@ -14,14 +14,50 @@ class App extends Component {
   state = {
     selectedFile: null,
     uploadProgress: null,
-    uploadMsg: null,
-    tablePage: null,
+    anonyProgress: null,
+    uploadCompleteMsg: null,
+    anonyCompleteMsg: null,
   };
+  componentDidMount() {
+    const that = this;
+
+    const es = new EventSource("http://127.0.0.1:9999/api/v1.0/stream");
+    es.addEventListener(
+      "myevent",
+      function (e) {
+        // 'myevent' 이벤트의 데이터 처리
+        var data = JSON.parse(e.data);
+        var p = Math.round(data.percent);
+        if (p == 100) {
+          that.setState({
+            anonyCompleteMsg: (
+              <h4
+                style={{
+                  color: "#C48D94",
+                  fontWeight: "bold",
+                }}
+              >
+                <u>Done!</u>
+              </h4>
+            ),
+            // toggle spinner to show zipping progress
+            // ...
+          });
+        }
+        if (!isNaN(p)) {
+          console.log("server", p);
+          that.setState({ anonyProgress: p });
+        }
+      },
+      false
+    );
+  }
   fileSelectedHandler = (event) => {
     this.setState({
-      uploadMsg: null,
-      tablePage: null,
       uploadProgress: null,
+      anonyProgress: null,
+      uploadCompleteMsg: null,
+      anonyCompleteMsg: null,
     });
 
     var fileList = event.target.files;
@@ -59,58 +95,69 @@ class App extends Component {
   };
 
   fileUploadHandler = () => {
-    this.setState({ uploadMsg: null, tablePage: null });
-    console.log(document.getElementsByClassName("form-control")[0].files.length)
+    this.setState({ uploadCompleteMsg: null, tablePage: null });
+    console.log(
+      document.getElementsByClassName("form-control")[0].files.length
+    );
     if (document.getElementsByClassName("form-control")[0].files.length == 0) {
-      console.log("fall-out")
+      console.log("fall-out");
       return;
     }
     const data = new FormData();
-    console.log(this.state.selectedFile)
+    console.log(this.state.selectedFile);
 
     data.append(
       "file",
       this.state.selectedFile[0],
-      this.state.selectedFile[0].name
+      this.state.selectedFile[0].name //todo. random string for user-identification
     );
 
-    console.log(this.state.selectedFile[0])
+    console.log(this.state.selectedFile[0]);
 
     axios
-      .post("http://155.230.214.71:9999/api/v1.0/anonymization", data, {
+      .post("http://127.0.0.1:9999/api/v1.0/anonymization", data, {
         onUploadProgress: (progressEvent) => {
-          console.log((progressEvent.loaded / progressEvent.total) * 100);
+          var p = Math.round(
+            (progressEvent.loaded / progressEvent.total) * 100
+          );
+
+          if (p == 100) {
+            this.setState({
+              uploadCompleteMsg: (
+                <h4
+                  style={{
+                    color: "#5d9cec",
+                    fontWeight: "bold",
+                  }}
+                >
+                  <u>Done!</u>
+                </h4>
+              ),
+              // toggle spinner to show unzip progress
+              // ...
+            });
+          }
+
+          console.log("upload", p);
           this.setState({
-            uploadProgress: Math.round(
-              (progressEvent.loaded / progressEvent.total) * 100
-            ),
+            uploadProgress: p,
           });
         },
       })
       .then((response) => {
         console.log(response.data);
-        this.setState({ uploadMsg: "Completed" });
+        this.setState({
+          uploadProgress: null,
+          anonyProgress: null,
+        });
         // TODO. will display download links
-        this.setState({ tablePage: <DatatablePage></DatatablePage> });
+        // this.setState({ tablePage: <DatatablePage></DatatablePage> });
       })
       .catch((error) => {
         // error handling
         alert("server is not responding....");
         console.log(error);
       });
-
-    // #### SSE test part ####
-    // #### check status during server-side job
-    axios.get("http://155.230.214.71:9999/api/v1.0/publish");
-    var es = new EventSource("http://155.230.214.71:9999/api/v1.0/stream");
-    es.addEventListener(
-      "myevent",
-      function (e) {
-        // 'myevent' 이벤트의 데이터 처리
-        console.log(e);
-      },
-      false
-    );
   };
   render() {
     const HoverBtn = styled.button`
@@ -129,8 +176,7 @@ class App extends Component {
           justifyContent: "space-between",
           alignItems: "center",
           flexDirection: "column",
-          margin: "10px",
-          padding: "8px 8px",
+          backgroundColor: "#272727",
         }}
       >
         {/* tar, zip, 파일 업로드 허용!
@@ -138,6 +184,10 @@ class App extends Component {
           1) 압축 해제
           2) 익명화
           3) 재압축하고 다운로드 링크 제공*/}
+        <div>
+          <img src={logo} className="App-logo" alt="logo" />
+        </div>
+
         <input
           style={{ width: "50%" }}
           type="file"
@@ -168,18 +218,62 @@ class App extends Component {
           </button> */}
           Upload & Run
         </button>
-        <h3>Upload Progress</h3>
-        <ProgressBar
-          radius={100}
-          progress={this.state.uploadProgress}
-          strokeWidth={18}
-          strokeColor="#5d9cec"
-          strokeLinecap="square"
-          trackStrokeWidth={18}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+          }}
         >
-          {this.state.uploadMsg}
-        </ProgressBar>
-        {this.state.tablePage}
+          <div
+            style={{
+              margin: "30px",
+            }}
+          >
+            <h4
+              style={{
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              Upload
+            </h4>
+            <ProgressBar
+              radius={100}
+              progress={this.state.uploadProgress}
+              strokeWidth={18}
+              strokeColor="#5d9cec"
+              strokeLinecap="square"
+              trackStrokeWidth={18}
+            >
+              {this.state.uploadCompleteMsg}
+            </ProgressBar>
+          </div>
+
+          <div
+            style={{
+              margin: "30px",
+            }}
+          >
+            <h4
+              style={{
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              Anonymization
+            </h4>
+            <ProgressBar
+              radius={100}
+              progress={this.state.anonyProgress}
+              strokeWidth={18}
+              strokeColor="#C48D94"
+              strokeLinecap="square"
+              trackStrokeWidth={18}
+            >
+              {this.state.anonyCompleteMsg}
+            </ProgressBar>
+          </div>
+        </div>
       </div>
     );
   }
