@@ -19,13 +19,24 @@ class App extends Component {
     compress: null,
     uploadDone: null,
     annDone: null,
+    eventId: null,
   };
   componentDidMount() {
     const that = this;
 
+    var N = 10; // for identification of redis event
+    var eventId = (Math.random().toString(36) + "00000000000000000").slice(
+      2,
+      N + 2
+    );
+
+    that.setState({
+      eventId: eventId,
+    });
+
     const es = new EventSource("http://125.190.142.88:9999/api/v1.0/stream");
     es.addEventListener(
-      "myevent",
+      eventId,
       function (e) {
         // 'myevent' 이벤트의 데이터 처리
         var data = JSON.parse(e.data);
@@ -160,6 +171,7 @@ class App extends Component {
       uploadDone: null,
       annDone: null,
     });
+    console.log("##############ID################", this.state.eventId);
     console.log(
       document.getElementsByClassName("form-control")[0].files.length
     );
@@ -175,6 +187,8 @@ class App extends Component {
       this.state.selectedFile[0],
       this.state.selectedFile[0].name //todo. random string for user-identification
     );
+
+    data.append("eventId", this.state.eventId);
 
     console.log(this.state.selectedFile[0]);
 
